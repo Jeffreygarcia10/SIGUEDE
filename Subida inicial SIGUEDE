@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIGUEDE · UTEDE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <!-- ════════════════════════════════════════════════════
+         FIREBASE SDK  (compat v9 — CDN, no npm necesario)
+         ════════════════════════════════════════════════════ -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --av:      #1a4f7a;
+            --tp:      #0d6e4e;
+            --aor:     #6b2c7a;
+            --vic:     #7a3000;
+            --dark:    #0f1923;
+            --mid:     #1e2d3d;
+            --surface: #f5f7fa;
+            --border:  #dce3ec;
+            --text:    #1a2535;
+            --muted:   #6b7a8d;
+            --accent:  #e8a020;
+            --danger:  #c0392b;
+            --success: #1a7a4f;
+            --warn:    #b87d00;
+        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Source Sans 3',sans-serif;background:var(--surface);color:var(--text);min-height:100vh}
+
+        /* ── LOGIN SCREEN ── */
+        #login-screen{
+            position:fixed;inset:0;background:linear-gradient(135deg,var(--dark) 0%,#1a3a55 100%);
+            display:flex;align-items:center;justify-content:center;z-index:9999;
+        }
+        .login-box{
+            background:white;border-radius:16px;padding:40px;width:90%;max-width:480px;
+            box-shadow:0 30px 80px rgba(0,0,0,0.5);text-align:center;
+        }
+        .login-logo{font-size:3em;margin-bottom:10px}
+        .login-title{font-family:'Barlow Condensed',sans-serif;font-size:2.2em;font-weight:800;color:var(--dark);margin-bottom:6px}
+        .login-sub{color:var(--muted);font-size:0.9em;margin-bottom:28px}
+        .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+        .role-btn{
+            padding:16px;border:3px solid var(--border);border-radius:10px;cursor:pointer;
+            background:white;transition:all .2s;font-family:'Source Sans 3',sans-serif;
+        }
+        .role-btn:hover{transform:translateY(-2px);box-shadow:0 5px 15px rgba(0,0,0,0.1)}
+        .role-btn.av{border-color:var(--av)}
+        .role-btn.av:hover,.role-btn.av.sel{background:var(--av);color:white}
+        .role-btn.tp{border-color:var(--tp)}
+        .role-btn.tp:hover,.role-btn.tp.sel{background:var(--tp);color:white}
+        .role-btn.aor{border-color:var(--aor)}
+        .role-btn.aor:hover,.role-btn.aor.sel{background:var(--aor);color:white}
+        .role-btn.vic{border-color:var(--vic)}
+        .role-btn.vic:hover,.role-btn.vic.sel{background:var(--vic);color:white}
+        .role-btn .rb-icon{font-size:1.8em;margin-bottom:6px}
+        .role-btn .rb-name{font-weight:700;font-size:0.95em}
+        .role-btn .rb-sub{font-size:0.78em;opacity:.7;margin-top:2px}
+        .pin-group{margin-top:16px;display:none}
+        .pin-input{
+            width:100%;padding:12px;border:2px solid var(--border);border-radius:8px;
+            font-size:1em;text-align:center;letter-spacing:4px;font-weight:700;
+        }
+        .pin-input:focus{outline:none;border-color:var(--av)}
+        .login-btn{
+            width:100%;margin-top:14px;padding:14px;
+            background:linear-gradient(135deg,var(--av),#2563a8);color:white;
+            border:none;border-radius:8px;font-size:1.1em;font-weight:700;cursor:pointer;
+            transition:all .2s;display:none;
+        }
+        .login-btn:hover{transform:translateY(-1px);box-shadow:0 5px 15px rgba(26,79,122,.4)}
+        .login-err{color:var(--danger);font-size:0.9em;margin-top:8px;display:none}
+
+        /* ── MAIN APP ── */
+        #app{display:none}
+        .app-header{background:var(--dark);position:sticky;top:0;z-index:100;box-shadow:0 2px 20px rgba(0,0,0,.4)}
+        .header-top{padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+        .header-brand{display:flex;align-items:center;gap:14px}
+        .brand-icon{width:44px;height:44px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:1.5em;border-radius:6px;flex-shrink:0}
+        .brand-text h1{font-family:'Barlow Condensed',sans-serif;font-size:1.6em;font-weight:800;color:white;letter-spacing:1px}
+        .brand-text p{font-size:0.78em;color:rgba(255,255,255,.55)}
+        .header-user{display:flex;align-items:center;gap:10px}
+        .user-badge{padding:6px 14px;border-radius:20px;font-size:0.85em;font-weight:700;color:white}
+        .sync-indicator{font-size:0.8em;color:rgba(255,255,255,.5);display:flex;align-items:center;gap:5px}
+        .sync-dot{width:8px;height:8px;border-radius:50%;background:#888}
+        .sync-dot.ok{background:#10b981}
+        .sync-dot.syncing{background:var(--accent);animation:pulse .8s infinite}
+        .logout-btn{background:rgba(255,255,255,.15);border:none;color:rgba(255,255,255,.7);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:0.85em;font-weight:600}
+        .logout-btn:hover{background:rgba(255,255,255,.25);color:white}
+
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+        .tabs-bar{display:flex;background:rgba(0,0,0,.3);padding:0 28px;gap:0;flex-wrap:wrap}
+        .tab-btn{padding:11px 20px;background:transparent;border:none;border-bottom:3px solid transparent;color:rgba(255,255,255,.5);cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:1em;font-weight:600;letter-spacing:.5px;transition:all .2s}
+        .tab-btn:hover{color:rgba(255,255,255,.8)}
+        .tab-btn.active{color:white;border-bottom-color:var(--accent)}
+
+        .main{padding:28px;max-width:1500px;margin:0 auto}
+        .tab-pane{display:none}
+        .tab-pane.active{display:block}
+
+        /* ── COMPONENTS ── */
+        .panel{background:white;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.06);overflow:hidden;margin-bottom:22px}
+        .panel-hdr{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+        .panel-title{font-family:'Barlow Condensed',sans-serif;font-size:1.2em;font-weight:700}
+        .panel-body{padding:22px}
+
+        .metrics-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:22px}
+        .metric{background:white;border-radius:10px;padding:18px;box-shadow:0 2px 12px rgba(0,0,0,.06);border-left:4px solid var(--av);display:flex;align-items:center;gap:14px}
+        .metric.green{border-color:var(--success)}
+        .metric.yellow{border-color:var(--warn)}
+        .metric.red{border-color:var(--danger)}
+        .metric-num{font-family:'Barlow Condensed',sans-serif;font-size:2.2em;font-weight:800;line-height:1}
+        .metric-label{font-size:.82em;color:var(--muted);font-weight:600}
+
+        table.dt{width:100%;border-collapse:collapse;font-size:.9em}
+        table.dt th{background:var(--dark);color:rgba(255,255,255,.9);padding:11px 13px;text-align:left;font-weight:600;font-size:.83em;letter-spacing:.4px}
+        table.dt td{padding:10px 13px;border-bottom:1px solid var(--border)}
+        table.dt tr:hover td{background:#f8fafc}
+
+        .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:.77em;font-weight:700}
+        .badge-completado{background:#d1fae5;color:#065f46}
+        .badge-progreso{background:#fef3c7;color:#92400e}
+        .badge-pendiente{background:#e5e7eb;color:#374151}
+
+        .pbar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;min-width:60px}
+        .pbar-fill{height:100%;border-radius:4px;transition:width .3s}
+
+        .btn{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:.88em;transition:all .2s;display:inline-flex;align-items:center;gap:5px}
+        .btn:hover{transform:translateY(-1px)}
+        .btn-primary{background:var(--av);color:white}
+        .btn-success{background:var(--success);color:white}
+        .btn-danger{background:var(--danger);color:white}
+        .btn-secondary{background:#6b7a8d;color:white}
+        .btn-sm{padding:4px 11px;font-size:.79em}
+
+        .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+        .fg{display:flex;flex-direction:column;gap:5px}
+        .fg.full{grid-column:1/-1}
+        .fg label{font-size:.82em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+        .fg input,.fg select,.fg textarea{padding:9px 11px;border:2px solid var(--border);border-radius:6px;font-family:'Source Sans 3',sans-serif;font-size:.94em;background:var(--surface);transition:border .2s}
+        .fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--av);background:white}
+
+        .modal-ov{display:none;position:fixed;inset:0;background:rgba(15,25,35,.75);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+        .modal-ov.open{display:flex}
+        .modal-box{background:white;border-radius:12px;padding:28px;width:90%;max-width:600px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+        .modal-title{font-family:'Barlow Condensed',sans-serif;font-size:1.5em;font-weight:800;margin-bottom:22px;color:var(--dark)}
+        .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;padding-top:18px;border-top:1px solid var(--border)}
+
+        .paq-section{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:18px}
+        .paq-head{display:flex;justify-content:space-between;align-items:center;padding:13px 18px;color:white}
+        .paq-head-title{font-family:'Barlow Condensed',sans-serif;font-size:1.1em;font-weight:700}
+
+        .seg-item{background:white;border-left:4px solid;border-radius:6px;padding:13px 15px;margin-bottom:9px;box-shadow:0 1px 5px rgba(0,0,0,.07)}
+        .seg-title{font-weight:700;margin-bottom:4px}
+        .seg-meta{font-size:.84em;color:var(--muted)}
+        .avance-block{background:var(--surface);border-radius:7px;padding:16px;margin-top:12px}
+        .avance-block h4{font-family:'Barlow Condensed',sans-serif;font-weight:700;margin-bottom:10px}
+        .avance-block p{font-size:.91em;white-space:pre-wrap;line-height:1.6}
+
+        .alert{padding:11px 15px;border-radius:6px;font-size:.88em;font-weight:600;margin-bottom:14px}
+        .alert-info{background:#dbeafe;color:#1e40af;border-left:4px solid #3b82f6}
+        .alert-warn{background:#fef3c7;color:#92400e;border-left:4px solid #f59e0b}
+        .alert-success{background:#d1fae5;color:#065f46;border-left:4px solid #10b981}
+
+        .vic-banner{background:linear-gradient(135deg,var(--vic),#a04010);color:white;padding:14px 22px;border-radius:10px;margin-bottom:20px;font-weight:600}
+
+        .color-dots{display:flex;gap:7px;flex-wrap:wrap}
+        .cdot{width:30px;height:30px;border-radius:6px;cursor:pointer;border:3px solid transparent;transition:all .2s}
+        .cdot:hover,.cdot.sel{border-color:var(--dark);transform:scale(1.12)}
+
+        .loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--muted);gap:12px;font-weight:600}
+        .spinner{width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--av);border-radius:50%;animation:spin .8s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+
+        @media(max-width:768px){
+            .metrics-row{grid-template-columns:1fr 1fr}
+            .role-grid{grid-template-columns:1fr 1fr}
+            .main{padding:14px}
+        }
+    </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════
+     LOGIN SCREEN
+══════════════════════════════════ -->
+<div id="login-screen">
+    <div class="login-box">
+        <div class="login-logo">📊</div>
+        <div class="login-title">SIGUEDE</div>
+        <div class="login-sub">Sistema Integrado de Gestión de Decanaturas · UTEDE</div>
+
+        <p style="font-size:.88em;font-weight:700;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">Selecciona tu perfil</p>
+
+        <div class="role-grid">
+            <div class="role-btn av" onclick="selRol('av')">
+                <div class="rb-icon">🎓</div>
+                <div class="rb-name">Agregación de Valor</div>
+                <div class="rb-sub">Decanatura</div>
+            </div>
+            <div class="role-btn tp" onclick="selRol('tp')">
+                <div class="rb-icon">🌱</div>
+                <div class="rb-name">Transformación Productiva</div>
+                <div class="rb-sub">Decanatura</div>
+            </div>
+            <div class="role-btn aor" onclick="selRol('aor')">
+                <div class="rb-icon">🎭</div>
+                <div class="rb-name">Arte, Ocio y Recreación</div>
+                <div class="rb-sub">Decanatura</div>
+            </div>
+            <div class="role-btn vic" onclick="selRol('vic')">
+                <div class="rb-icon">🏛️</div>
+                <div class="rb-name">Vicerrectoría Académica</div>
+                <div class="rb-sub">Vista consolidada</div>
+            </div>
+        </div>
+
+        <div class="pin-group" id="pin-group">
+            <input class="pin-input" type="password" id="pin-input" placeholder="PIN de acceso" maxlength="6"
+                   oninput="if(this.value.length===this.maxLength) intentarLogin()">
+        </div>
+
+        <button class="login-btn" id="login-btn" onclick="intentarLogin()">Ingresar →</button>
+        <div class="login-err" id="login-err">PIN incorrecto. Inténtalo de nuevo.</div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════
+     APP
+══════════════════════════════════ -->
+<div id="app">
+    <header class="app-header">
+        <div class="header-top">
+            <div class="header-brand">
+                <div class="brand-icon">📊</div>
+                <div class="brand-text">
+                    <h1>SIGUEDE</h1>
+                    <p>Sistema Integrado de Gestión de Decanaturas · UTEDE 2026-A</p>
+                </div>
+            </div>
+            <div class="header-user">
+                <div class="sync-indicator">
+                    <div class="sync-dot" id="sync-dot"></div>
+                    <span id="sync-label">Conectando...</span>
+                </div>
+                <div class="user-badge" id="user-badge"></div>
+                <button class="logout-btn" onclick="cerrarSesion()">Salir</button>
+            </div>
+        </div>
+        <nav class="tabs-bar" id="tabs-bar">
+            <button class="tab-btn active" onclick="showTab('dashboard',this)">Dashboard</button>
+            <button class="tab-btn" onclick="showTab('edt',this)">EDT</button>
+            <button class="tab-btn" onclick="showTab('gantt',this)">Gantt</button>
+            <button class="tab-btn" onclick="showTab('semanal',this)">Seguimiento Semanal</button>
+        </nav>
+    </header>
+
+    <main class="main">
+        <!-- DASHBOARD -->
+        <div id="tab-dashboard" class="tab-pane active">
+            <div id="vic-banner-dash"></div>
+            <div class="metrics-row" id="dash-metrics"><div class="loading"><div class="spinner"></div> Cargando datos...</div></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:22px">
+                <div class="panel"><div class="panel-hdr"><span class="panel-title">Avance por Componente</span></div><div class="panel-body" id="dash-avance"></div></div>
+                <div class="panel"><div class="panel-hdr"><span class="panel-title">Alertas</span></div><div class="panel-body" id="dash-alertas"></div></div>
+            </div>
+            <div class="panel">
+                <div class="panel-hdr"><span class="panel-title">Actividades Activas</span></div>
+                <div class="panel-body" style="padding:0;overflow-x:auto"><table class="dt" id="dash-tabla"></table></div>
+            </div>
+        </div>
+
+        <!-- EDT -->
+        <div id="tab-edt" class="tab-pane">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:12px">
+                <div>
+                    <h2 style="font-family:'Barlow Condensed',sans-serif;font-size:1.75em;font-weight:800">Estructura de Desglose del Trabajo</h2>
+                    <p id="edt-sub" style="color:var(--muted);font-size:.88em;margin-top:3px"></p>
+                </div>
+                <button class="btn btn-primary" id="btn-nuevo-paq" onclick="abrirModalPaq()">+ Nuevo Componente</button>
+            </div>
+            <div id="edt-container"><div class="loading"><div class="spinner"></div> Cargando...</div></div>
+        </div>
+
+        <!-- GANTT -->
+        <div id="tab-gantt" class="tab-pane">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+                <h2 style="font-family:'Barlow Condensed',sans-serif;font-size:1.75em;font-weight:800">Gantt Dinámico</h2>
+                <select id="gantt-scale" onchange="renderGantt()" style="padding:9px 13px;border:2px solid var(--border);border-radius:6px;font-weight:600">
+                    <option value="sem">Semanal</option>
+                    <option value="mes">Mensual</option>
+                </select>
+            </div>
+            <div class="panel"><div class="panel-body" style="padding:0;overflow-x:auto" id="gantt-wrap"></div></div>
+            <div class="panel" style="margin-top:18px"><div class="panel-hdr"><span class="panel-title">Leyenda</span></div><div class="panel-body" id="gantt-ley" style="display:flex;flex-wrap:wrap;gap:14px"></div></div>
+        </div>
+
+        <!-- SEMANAL -->
+        <div id="tab-semanal" class="tab-pane">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:12px">
+                <h2 style="font-family:'Barlow Condensed',sans-serif;font-size:1.75em;font-weight:800">Seguimiento Semanal</h2>
+                <div style="display:flex;align-items:center;gap:10px">
+                    <label style="font-weight:700;font-size:.88em;color:var(--muted)">SEMANA:</label>
+                    <select id="sem-sel" onchange="renderSemanal()" style="padding:9px 13px;border:2px solid var(--border);border-radius:6px;font-weight:600;min-width:280px"></select>
+                </div>
+            </div>
+            <div id="sem-container"></div>
+        </div>
+    </main>
+</div>
+
+<!-- MODAL PAQUETE -->
+<div class="modal-ov" id="modal-paq">
+    <div class="modal-box">
+        <div class="modal-title">Nuevo Componente</div>
+        <form onsubmit="guardarPaq(event)">
+            <div class="form-grid">
+                <div class="fg full"><label>Nombre *</label><input type="text" id="fp-nom" required placeholder="Ej: Gestión Curricular"></div>
+                <div class="fg full"><label>Color</label><div class="color-dots" id="fp-dots"></div><input type="hidden" id="fp-color" value="#1a4f7a"></div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="cerrarModal('modal-paq')">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL TAREA -->
+<div class="modal-ov" id="modal-tarea">
+    <div class="modal-box">
+        <div class="modal-title" id="mt-titulo">Nueva Actividad</div>
+        <form onsubmit="guardarTarea(event)">
+            <input type="hidden" id="ft-modo"><input type="hidden" id="ft-paq"><input type="hidden" id="ft-tid">
+            <div class="form-grid">
+                <div class="fg full"><label>Actividad *</label><input type="text" id="ft-nom" required></div>
+                <div class="fg full"><label>Responsable</label><input type="text" id="ft-resp"></div>
+                <div class="fg"><label>Fecha Inicio *</label><input type="date" id="ft-ini" required></div>
+                <div class="fg"><label>Fecha Fin *</label><input type="date" id="ft-fin" required></div>
+                <div class="fg"><label>Estado</label>
+                    <select id="ft-est">
+                        <option value="pendiente">No Iniciado</option>
+                        <option value="progreso">En Progreso</option>
+                        <option value="completado">Completado</option>
+                    </select>
+                </div>
+                <div class="fg"><label>Avance (%)</label><input type="number" id="ft-av" min="0" max="100" value="0"></div>
+                <div class="fg full"><label>Notas</label><textarea id="ft-notas" rows="2"></textarea></div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-danger btn-sm" id="btn-del-tarea" onclick="eliminarTarea()" style="display:none;margin-right:auto">Eliminar</button>
+                <button type="button" class="btn btn-secondary" onclick="cerrarModal('modal-tarea')">Cancelar</button>
+                <button type="submit" class="btn btn-success">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL SEGUIMIENTO -->
+<div class="modal-ov" id="modal-seg">
+    <div class="modal-box">
+        <div class="modal-title" id="ms-titulo">Registro Semanal</div>
+        <form onsubmit="guardarSeg(event)">
+            <input type="hidden" id="fs-sem">
+            <div class="fg" style="margin-bottom:14px"><label>Actividades Realizadas *</label><textarea id="fs-act" rows="4" required placeholder="Describa las actividades ejecutadas..."></textarea></div>
+            <div class="fg" style="margin-bottom:14px"><label>Resultados / Logros *</label><textarea id="fs-res" rows="4" required placeholder="Describa los resultados obtenidos..."></textarea></div>
+            <div class="fg" style="margin-bottom:14px"><label>Obstáculos</label><textarea id="fs-obs" rows="3" placeholder="Dificultades o pendientes..."></textarea></div>
+            <div class="fg"><label>Plan Semana Siguiente</label><textarea id="fs-prox" rows="3" placeholder="Actividades proyectadas..."></textarea></div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="cerrarModal('modal-seg')">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Guardar Seguimiento</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════
+   ▼▼▼  CONFIGURA FIREBASE AQUÍ  ▼▼▼
+   (Llena con los datos de tu proyecto Firebase)
+   ════════════════════════════════════════════════════ */
+const FIREBASE_CONFIG = {
+    apiKey:            "REEMPLAZA_CON_TU_API_KEY",
+    authDomain:        "REEMPLAZA.firebaseapp.com",
+    projectId:         "REEMPLAZA_CON_TU_PROJECT_ID",
+    storageBucket:     "REEMPLAZA.appspot.com",
+    messagingSenderId: "REEMPLAZA",
+    appId:             "REEMPLAZA"
+};
+
+/* ════════════════════════════════════════════════════
+   PINES DE ACCESO (cambia estos por los que quieras)
+   ════════════════════════════════════════════════════ */
+const PINES = {
+    av:  "1234",   // ← cambia este PIN para Agregación de Valor
+    tp:  "2345",   // ← cambia este PIN para Transformación Productiva
+    aor: "3456",   // ← cambia este PIN para Arte, Ocio y Recreación
+    vic: "9999"    // ← cambia este PIN para Vicerrectoría
+};
+
+/* ════════════════════════════════════════════════════
+   DATOS INICIALES  — EDT 2026-A PRECARGADA
+   ════════════════════════════════════════════════════ */
+const EDT_DEFAULT = {
+    av: {
+        nombre:"Red Agregación de Valor",
+        responsable:"Jeffrey Lozano García",
+        paquetes:[
+            { id:"P1", nombre:"Continuidad y Acceso a la Formación", color:"#1a4f7a",
+              tareas:[
+                {id:"P1T1",nombre:"Seguimiento y recolección syllabi NBC",responsable:"Decano + Coordinadores",inicio:"2026-02-01",fin:"2026-02-20",estado:"completado",avance:100,notas:""},
+                {id:"P1T2",nombre:"Seguimiento y recolección syllabi NBF",responsable:"Decano",inicio:"2026-02-01",fin:"2026-02-25",estado:"completado",avance:100,notas:""},
+                {id:"P1T3",nombre:"Gestión casos especiales (homologaciones / apelaciones)",responsable:"Decano + Registro y Control",inicio:"2026-02-01",fin:"2026-06-30",estado:"progreso",avance:40,notas:"Proceso permanente del semestre"},
+                {id:"P1T4",nombre:"Equivalencias curriculares 2025→2026",responsable:"Decano + Registro y Control",inicio:"2026-02-01",fin:"2026-04-15",estado:"progreso",avance:55,notas:""},
+                {id:"P1T5",nombre:"Coordinación con Registro y Control (SNIES)",responsable:"Decano",inicio:"2026-02-01",fin:"2026-06-30",estado:"progreso",avance:35,notas:""},
+                {id:"P1T6",nombre:"Seguimiento trayectorias estudiantiles",responsable:"Decano",inicio:"2026-02-15",fin:"2026-06-15",estado:"progreso",avance:30,notas:""}
+              ]},
+            { id:"P2", nombre:"Impulso a la Investigación Aplicada", color:"#0d6e4e",
+              tareas:[
+                {id:"P2T1",nombre:"Plan recuperación grupos de investigación",responsable:"Decano + Coordinadores Inv.",inicio:"2026-02-15",fin:"2026-04-30",estado:"pendiente",avance:10,notas:"Estrategia recategorización Minciencias"},
+                {id:"P2T2",nombre:"Articulación y seguimiento trabajos de grado",responsable:"Decano + Directores TG",inicio:"2026-02-01",fin:"2026-06-30",estado:"progreso",avance:45,notas:""},
+                {id:"P2T3",nombre:"Fomento cultura investigativa",responsable:"Decano",inicio:"2026-03-01",fin:"2026-05-30",estado:"pendiente",avance:0,notas:""},
+                {id:"P2T4",nombre:"Acompañamiento seminarios de investigación",responsable:"Decano + Seminaristas",inicio:"2026-02-01",fin:"2026-06-30",estado:"progreso",avance:40,notas:""}
+              ]},
+            { id:"P3", nombre:"Promoción de la-Técnica y lo-Técnico", color:"#6b2c7a",
+              tareas:[
+                {id:"P3T1",nombre:"Revisión coherencia pedagógica NBC-NBF",responsable:"Decano",inicio:"2026-02-15",fin:"2026-03-31",estado:"progreso",avance:50,notas:""},
+                {id:"P3T2",nombre:"Capacitación docente en modelo pedagógico",responsable:"Decano + Vicerrectoría",inicio:"2026-03-01",fin:"2026-04-15",estado:"pendiente",avance:0,notas:""},
+                {id:"P3T3",nombre:"Producción contenidos digitales NBF (OVAs, infografías, videos)",responsable:"Decano + Equipo producción",inicio:"2026-02-01",fin:"2026-05-31",estado:"progreso",avance:25,notas:""}
+              ]},
+            { id:"P4", nombre:"Vinculación con la Comunidad", color:"#b87d00",
+              tareas:[
+                {id:"P4T1",nombre:"Seguimiento prácticas empresariales y contratos",responsable:"Decano + Coordinadores",inicio:"2026-02-01",fin:"2026-06-30",estado:"progreso",avance:30,notas:""},
+                {id:"P4T2",nombre:"Gestión convenios sector productivo",responsable:"Decano + Extensión",inicio:"2026-03-01",fin:"2026-06-30",estado:"pendiente",avance:0,notas:""},
+                {id:"P4T3",nombre:"Eventos y foros académicos Red AV",responsable:"Decano",inicio:"2026-04-01",fin:"2026-05-31",estado:"pendiente",avance:0,notas:""}
+              ]},
+            { id:"P5", nombre:"Gestión Académico-Administrativa", color:"#c0392b",
+              tareas:[
+                {id:"P5T1",nombre:"Informe de gestión Decanatura – corte 1 (abril)",responsable:"Decano",inicio:"2026-03-15",fin:"2026-04-15",estado:"pendiente",avance:0,notas:""},
+                {id:"P5T2",nombre:"Evaluación docente periodo 2026-A",responsable:"Decano + Vicerrectoría",inicio:"2026-05-01",fin:"2026-06-15",estado:"pendiente",avance:0,notas:"Conforme Reglamento Evaluación Profesoral"},
+                {id:"P5T3",nombre:"Reuniones de red y coordinación periódica",responsable:"Decano",inicio:"2026-02-01",fin:"2026-06-30",estado:"progreso",avance:40,notas:"Reuniones semanales"},
+                {id:"P5T4",nombre:"Informe de gestión – cierre semestre",responsable:"Decano",inicio:"2026-06-01",fin:"2026-06-30",estado:"pendiente",avance:0,notas:""}
+              ]},
+            { id:"P6", nombre:"Preparación Semestre 2026-B", color:"#1565a0",
+              tareas:[
+                {id:"P6T1",nombre:"Construcción BD Proyección Académica 2026-B",responsable:"Decano + Coordinadores",inicio:"2026-05-01",fin:"2026-05-31",estado:"pendiente",avance:0,notas:""},
+                {id:"P6T2",nombre:"Definición y validación horarios 2026-B",responsable:"Decano + Registro",inicio:"2026-06-01",fin:"2026-06-20",estado:"pendiente",avance:0,notas:""},
+                {id:"P6T3",nombre:"Asignación carga docente 2026-B",responsable:"Decano",inicio:"2026-06-01",fin:"2026-06-25",estado:"pendiente",avance:0,notas:""},
+                {id:"P6T4",nombre:"Plan de necesidades y contrataciones 2026-B",responsable:"Decano + Vicerrectoría",inicio:"2026-06-15",fin:"2026-07-15",estado:"pendiente",avance:0,notas:""}
+              ]}
+        ]
+    },
+    tp: {
+        nombre:"Red Transformación Productiva", responsable:"Decano/a de la Red",
+        paquetes:[
+            {id:"P1",nombre:"Continuidad y Acceso a la Formación",color:"#0d6e4e",tareas:[
+                {id:"P1T1",nombre:"Seguimiento syllabi NBC y NBF",responsable:"Decano/a",inicio:"2026-02-01",fin:"2026-02-28",estado:"pendiente",avance:0,notas:""},
+                {id:"P1T2",nombre:"Gestión casos especiales",responsable:"Decano/a + Registro",inicio:"2026-02-01",fin:"2026-06-30",estado:"pendiente",avance:0,notas:""}]},
+            {id:"P2",nombre:"Investigación y Trabajos de Grado",color:"#1a4f7a",tareas:[
+                {id:"P2T1",nombre:"Seguimiento grupos de investigación",responsable:"Decano/a",inicio:"2026-02-01",fin:"2026-06-30",estado:"pendiente",avance:0,notas:""},
+                {id:"P2T2",nombre:"Articulación trabajos de grado y semilleros",responsable:"Decano/a + Directores",inicio:"2026-02-01",fin:"2026-06-30",estado:"pendiente",avance:0,notas:""}]},
+            {id:"P3",nombre:"Gestión Académico-Administrativa",color:"#6b2c7a",tareas:[
+                {id:"P3T1",nombre:"Informes de gestión semestrales",responsable:"Decano/a",inicio:"2026-04-01",fin:"2026-06-30",estado:"pendiente",avance:0,notas:""}]},
+            {id:"P4",nombre:"Preparación Semestre 2026-B",color:"#b87d00",tareas:[
+                {id:"P4T1",nombre:"Proyección académica y horarios 2026-B",responsable:"Decano/a + Registro",inicio:"2026-05-01",fin:"2026-06-30",estado:"pendiente",avance:0,notas:""}]}
+        ]
+    },
+    aor: {
+        nombre:"Red Arte, Ocio y Recreación", responsable:"Decano/a de la Red",
+        paquetes:[
+            {id:"P1",nombre:"Continuidad y Acceso a la Formación",color:"#6b2c7a",tareas:[
+                {id:"P1T1",nombre:"Seguimiento syllabi y oferta académica",responsable:"Decano/a",inicio:"2026-02-01",fin:"2026-02-28",estado:"pendiente",avance:0,notas:""},
+                {id:"P1T2",nombre:"Gestión casos especiales",responsable:"Decano/a + Registro",inicio:"2026-02-01",fin:"2026-06-30",estado:"pendiente",avance:0,notas:""}]},
+            {id:"P2",nombre:"Vinculación con la Comunidad",color:"#b87d00",tareas:[
+                {id:"P2T1",nombre:"Eventos culturales y artísticos",responsable:"Decano/a",inicio:"2026-03-01",fin:"2026-05-31",estado:"pendiente",avance:0,notas:""},
+                {id:"P2T2",nombre:"Convenios con entidades culturales",responsable:"Decano/a + Extensión",inicio:"2026-02-15",fin:"2026-06-30",estado:"pendiente",avance:0,notas:""}]},
+            {id:"P3",nombre:"Gestión Académico-Administrativa",color:"#c0392b",tareas:[
+                {id:"P3T1",nombre:"Informes de gestión semestral",responsable:"Decano/a",inicio:"2026-04-01",fin:"2026-06-30",estado:"pendiente",avance:0,notas:""}]},
+            {id:"P4",nombre:"Preparación Semestre 2026-B",color:"#1565a0",tareas:[
+                {id:"P4T1",nombre:"Proyección académica 2026-B",responsable:"Decano/a + Registro",inicio:"2026-05-01",fin:"2026-06-30",estado:"pendiente",avance:0,notas:""}]}
+        ]
+    }
+};
+
+const COLORES = ['#1a4f7a','#0d6e4e','#6b2c7a','#b87d00','#c0392b','#1565a0','#1a7a4f','#5d4037'];
+const NOMBRES_ROL = {av:"Decanatura · Agregación de Valor",tp:"Decanatura · Transformación Productiva",aor:"Decanatura · Arte, Ocio y Recreación",vic:"Vicerrectoría Académica"};
+const COLORS_ROL  = {av:"#1a4f7a",tp:"#0d6e4e",aor:"#6b2c7a",vic:"#7a3000"};
+
+/* ════════════════════════════════════════════════════
+   ESTADO
+   ════════════════════════════════════════════════════ */
+let db, rolActivo = null, tabActiva = 'dashboard';
+let DATOS = {}, SEG = {};
+
+/* ════════════════════════════════════════════════════
+   INIT FIREBASE
+   ════════════════════════════════════════════════════ */
+function initFirebase() {
+    try {
+        firebase.initializeApp(FIREBASE_CONFIG);
+        db = firebase.firestore();
+        setSyncOk();
+    } catch(e) {
+        console.error("Firebase error:", e);
+        setSyncError();
+    }
+}
+
+function setSyncOk()    { const d=document.getElementById('sync-dot'); const l=document.getElementById('sync-label'); if(d){d.className='sync-dot ok'; l.textContent='Sincronizado';} }
+function setSyncError() { const d=document.getElementById('sync-dot'); const l=document.getElementById('sync-label'); if(d){d.className='sync-dot'; d.style.background='var(--danger)'; l.textContent='Sin conexión – modo local';} }
+function setSyncing()   { const d=document.getElementById('sync-dot'); const l=document.getElementById('sync-label'); if(d){d.className='sync-dot syncing'; l.textContent='Guardando...';} }
+
+/* ════════════════════════════════════════════════════
+   LOGIN
+   ════════════════════════════════════════════════════ */
+let rolSeleccionado = null;
+
+function selRol(rol) {
+    rolSeleccionado = rol;
+    document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('sel'));
+    event.currentTarget.classList.add('sel');
+    document.getElementById('pin-group').style.display = 'block';
+    document.getElementById('login-btn').style.display  = 'block';
+    document.getElementById('login-err').style.display  = 'none';
+    document.getElementById('pin-input').value = '';
+    document.getElementById('pin-input').focus();
+}
+
+function intentarLogin() {
+    if (!rolSeleccionado) return;
+    const pin = document.getElementById('pin-input').value.trim();
+    if (pin === PINES[rolSeleccionado]) {
+        rolActivo = rolSeleccionado;
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        const badge = document.getElementById('user-badge');
+        badge.textContent = NOMBRES_ROL[rolActivo];
+        badge.style.background = COLORS_ROL[rolActivo];
+        if (rolActivo === 'vic') setupVic();
+        else cargarDatos(rolActivo);
+    } else {
+        const err = document.getElementById('login-err');
+        err.style.display = 'block';
+        err.textContent = 'PIN incorrecto. Inténtalo de nuevo.';
+        document.getElementById('pin-input').value = '';
+    }
+}
+
+function cerrarSesion() {
+    rolActivo = null; rolSeleccionado = null;
+    document.getElementById('app').style.display  = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    document.querySelectorAll('.role-btn').forEach(b=>b.classList.remove('sel'));
+    document.getElementById('pin-group').style.display='none';
+    document.getElementById('login-btn').style.display='none';
+}
+
+/* ════════════════════════════════════════════════════
+   CARGA / GUARDA DATOS EN FIRESTORE
+   ════════════════════════════════════════════════════ */
+async function cargarDatos(dec) {
+    try {
+        const snap = await db.collection('edt').doc(dec).get();
+        if (snap.exists && snap.data().paquetes) {
+            DATOS[dec] = snap.data();
+        } else {
+            DATOS[dec] = JSON.parse(JSON.stringify(EDT_DEFAULT[dec]));
+            await guardarDatos(dec); // inicializa en Firestore
+        }
+        const segSnap = await db.collection('seguimiento').where('dec','==',dec).get();
+        SEG[dec] = {};
+        segSnap.forEach(d => { SEG[dec][d.id] = d.data(); });
+    } catch(e) {
+        console.warn("Firestore no disponible, usando datos locales:", e);
+        setSyncError();
+        const local = localStorage.getItem('sig_'+dec);
+        DATOS[dec] = local ? JSON.parse(local) : JSON.parse(JSON.stringify(EDT_DEFAULT[dec]));
+        const localSeg = localStorage.getItem('sig_seg_'+dec);
+        SEG[dec] = localSeg ? JSON.parse(localSeg) : {};
+    }
+    buildSemOpts();
+    renderTab(tabActiva);
+}
+
+async function guardarDatos(dec) {
+    setSyncing();
+    localStorage.setItem('sig_'+dec, JSON.stringify(DATOS[dec]));
+    try {
+        await db.collection('edt').doc(dec).set(DATOS[dec]);
+        setSyncOk();
+    } catch(e) {
+        console.warn("No se pudo guardar en Firestore:", e);
+        setSyncError();
+    }
+}
+
+async function guardarSegFirestore(key, datos) {
+    setSyncing();
+    localStorage.setItem('sig_seg_'+rolActivo, JSON.stringify(SEG[rolActivo]));
+    try {
+        await db.collection('seguimiento').doc(key).set(datos);
+        setSyncOk();
+    } catch(e) {
+        setSyncError();
+    }
+}
+
+/* ════════════════════════════════════════════════════
+   VICERRECTORÍA
+   ════════════════════════════════════════════════════ */
+async function setupVic() {
+    document.getElementById('btn-nuevo-paq') && (document.getElementById('btn-nuevo-paq').style.display='none');
+    document.getElementById('vic-banner-dash').innerHTML = `<div class="vic-banner">🏛️ Vista Consolidada Vicerrectoría Académica — Todas las Redes · Solo Lectura</div>`;
+
+    for (const dec of ['av','tp','aor']) {
+        try {
+            const snap = await db.collection('edt').doc(dec).get();
+            DATOS[dec] = snap.exists ? snap.data() : JSON.parse(JSON.stringify(EDT_DEFAULT[dec]));
+            const segSnap = await db.collection('seguimiento').where('dec','==',dec).get();
+            SEG[dec] = {};
+            segSnap.forEach(d => { SEG[dec][d.id] = d.data(); });
+        } catch(e) {
+            DATOS[dec] = JSON.parse(JSON.stringify(EDT_DEFAULT[dec]));
+            SEG[dec] = {};
+        }
+    }
+    renderVicDashboard();
+}
+
+function renderVicDashboard() {
+    let metHtml = '', avHtml = '';
+    ['av','tp','aor'].forEach(dec => {
+        const d = DATOS[dec];
+        if (!d) return;
+        let total=0,comp=0,prog=0;
+        d.paquetes.forEach(p=>p.tareas.forEach(t=>{total++;if(t.estado==='completado')comp++;if(t.estado==='progreso')prog++;}));
+        const av = total?Math.round(d.paquetes.reduce((s,p)=>s+p.tareas.reduce((ss,t)=>ss+t.avance,0),0)/total):0;
+        metHtml += `
+        <div class="metric" style="border-color:${COLORS_ROL[dec]}">
+            <div>
+                <div style="font-size:.8em;font-weight:700;color:${COLORS_ROL[dec]};text-transform:uppercase;margin-bottom:4px">${d.nombre}</div>
+                <div style="display:flex;gap:12px;margin-top:4px">
+                    <span><strong>${total}</strong> <small>tareas</small></span>
+                    <span><strong>${comp}</strong> <small>✓</small></span>
+                    <span><strong>${prog}</strong> <small>↻</small></span>
+                </div>
+            </div>
+            <div style="text-align:right">
+                <div class="metric-num" style="color:${COLORS_ROL[dec]}">${av}%</div>
+                <div class="metric-label">Avance</div>
+            </div>
+        </div>`;
+        avHtml += `<div style="margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+                <span style="font-weight:700;font-size:.9em">${d.nombre}</span>
+                <span style="font-weight:800;color:${COLORS_ROL[dec]}">${av}%</span>
+            </div>
+            <div class="pbar"><div class="pbar-fill" style="width:${av}%;background:${COLORS_ROL[dec]}"></div></div>
+        </div>`;
+    });
+    document.getElementById('dash-metrics').innerHTML = metHtml;
+    document.getElementById('dash-avance').innerHTML = avHtml;
+    document.getElementById('dash-alertas').innerHTML = '<div class="alert alert-info">Vista consolidada de las tres redes académicas.</div>';
+    document.getElementById('dash-tabla').innerHTML = '';
+}
+
+/* ════════════════════════════════════════════════════
+   TABS
+   ════════════════════════════════════════════════════ */
+function showTab(tab, el) {
+    tabActiva = tab;
+    document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('tab-'+tab).classList.add('active');
+    if(el) el.classList.add('active');
+    renderTab(tab);
+}
+
+function renderTab(tab) {
+    if (tab==='dashboard') { if(rolActivo==='vic') renderVicDashboard(); else renderDashboard(); }
+    if (tab==='edt')       renderEDT();
+    if (tab==='gantt')     renderGantt();
+    if (tab==='semanal')   { buildSemOpts(); renderSemanal(); }
+}
+
+/* ════════════════════════════════════════════════════
+   DASHBOARD
+   ════════════════════════════════════════════════════ */
+function renderDashboard() {
+    const dec = DATOS[rolActivo];
+    if (!dec) return;
+    const hoy = new Date();
+    let total=0,comp=0,prog=0,atras=0;
+    dec.paquetes.forEach(p=>p.tareas.forEach(t=>{
+        total++; if(t.estado==='completado')comp++; if(t.estado==='progreso')prog++;
+        if(new Date(t.fin)<hoy&&t.estado!=='completado')atras++;
+    }));
+    document.getElementById('dash-metrics').innerHTML=`
+        <div class="metric"><span style="font-size:2em">📋</span><div><div class="metric-num">${total}</div><div class="metric-label">Actividades</div></div></div>
+        <div class="metric green"><span style="font-size:2em">✅</span><div><div class="metric-num">${comp}</div><div class="metric-label">Completadas · ${total?Math.round(comp/total*100):0}%</div></div></div>
+        <div class="metric yellow"><span style="font-size:2em">🔄</span><div><div class="metric-num">${prog}</div><div class="metric-label">En Progreso</div></div></div>
+        <div class="metric red"><span style="font-size:2em">⚠️</span><div><div class="metric-num">${atras}</div><div class="metric-label">Atrasadas</div></div></div>`;
+
+    let avH='';
+    dec.paquetes.forEach(p=>{
+        const a=p.tareas.length?Math.round(p.tareas.reduce((s,t)=>s+t.avance,0)/p.tareas.length):0;
+        avH+=`<div style="margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+                <span style="font-weight:700;font-size:.9em">${p.nombre}</span>
+                <span style="font-weight:800;color:${p.color}">${a}%</span>
+            </div>
+            <div class="pbar"><div class="pbar-fill" style="width:${a}%;background:${p.color}"></div></div>
+        </div>`;
+    });
+    document.getElementById('dash-avance').innerHTML=avH;
+
+    let altH='';
+    if(atras) altH+=`<div class="alert alert-warn">⚠️ ${atras} tarea(s) superaron su fecha límite.</div>`;
+    const prox=[];
+    dec.paquetes.forEach(p=>p.tareas.forEach(t=>{
+        if(t.estado!=='completado'){
+            const d=Math.ceil((new Date(t.fin)-hoy)/86400000);
+            if(d>=0&&d<=14) prox.push({...t,paq:p.nombre,color:p.color,dias:d});
+        }
+    }));
+    prox.sort((a,b)=>a.dias-b.dias);
+    if(prox.length) prox.slice(0,5).forEach(t=>{
+        altH+=`<div class="seg-item" style="border-color:${t.color}"><div class="seg-title">${t.nombre}</div><div class="seg-meta">${t.paq} · vence en <strong>${t.dias} días</strong></div></div>`;
+    });
+    if(!altH) altH='<div class="alert alert-success">✅ Sin alertas críticas.</div>';
+    document.getElementById('dash-alertas').innerHTML=altH;
+
+    const all=[];
+    dec.paquetes.forEach(p=>p.tareas.forEach(t=>{if(t.estado!=='completado')all.push({...t,paq:p.nombre,color:p.color})}));
+    all.sort((a,b)=>new Date(a.fin)-new Date(b.fin));
+    let tH='<thead><tr><th>Actividad</th><th>Componente</th><th>Responsable</th><th>Fecha Fin</th><th>Estado</th><th>Avance</th></tr></thead><tbody>';
+    all.slice(0,10).forEach(t=>{
+        const d=Math.ceil((new Date(t.fin)-hoy)/86400000);
+        tH+=`<tr>
+            <td><strong>${t.nombre}</strong></td>
+            <td><span style="padding:3px 8px;border-radius:12px;font-size:.78em;font-weight:700;background:${t.color}20;color:${t.color}">${t.paq}</span></td>
+            <td style="font-size:.86em;color:var(--muted)">${t.responsable||'-'}</td>
+            <td>${fmt(t.fin)} <small style="color:${d<0?'var(--danger)':d<7?'var(--warn)':'var(--muted)'}">${d<0?'Atrasado '+Math.abs(d)+'d':d+'d'}</small></td>
+            <td>${badgeE(t.estado)}</td>
+            <td><div style="display:flex;align-items:center;gap:6px"><div class="pbar" style="min-width:60px"><div class="pbar-fill" style="width:${t.avance}%;background:${t.color}"></div></div><span style="font-size:.8em;font-weight:700">${t.avance}%</span></div></td>
+        </tr>`;
+    });
+    tH+='</tbody>';
+    document.getElementById('dash-tabla').innerHTML=tH;
+}
+
+/* ════════════════════════════════════════════════════
+   EDT
+   ════════════════════════════════════════════════════ */
+function renderEDT() {
+    const dec = DATOS[rolActivo];
+    if (!dec) { document.getElementById('edt-container').innerHTML='<div class="loading"><div class="spinner"></div> Cargando...</div>'; return; }
+    document.getElementById('edt-sub').textContent = dec.nombre + ' · ' + dec.responsable;
+    const soloLec = rolActivo === 'vic';
+    if (soloLec) document.getElementById('btn-nuevo-paq').style.display='none';
+
+    let h='';
+    dec.paquetes.forEach(p=>{
+        const av=p.tareas.length?Math.round(p.tareas.reduce((s,t)=>s+t.avance,0)/p.tareas.length):0;
+        h+=`<div class="paq-section">
+            <div class="paq-head" style="background:${p.color}">
+                <span class="paq-head-title">${p.nombre}</span>
+                <div style="display:flex;align-items:center;gap:10px">
+                    <span style="font-size:.83em;opacity:.85">${av}% · ${p.tareas.length} actividades</span>
+                    ${!soloLec?`<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:white;border:1px solid rgba(255,255,255,.3)" onclick="abrirModalTarea('${p.id}')">+ Agregar</button>`:''}
+                </div>
+            </div>
+            <div style="overflow-x:auto">
+            <table class="dt">
+            <thead><tr><th>ID</th><th>Actividad</th><th>Responsable</th><th>Inicio</th><th>Fin</th><th>Estado</th><th>Avance</th>${!soloLec?'<th></th>':''}</tr></thead>
+            <tbody>`;
+        if(!p.tareas.length) h+=`<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:18px">Sin actividades.</td></tr>`;
+        p.tareas.forEach(t=>{
+            const atras=new Date(t.fin)<new Date()&&t.estado!=='completado';
+            h+=`<tr>
+                <td style="font-family:monospace;font-size:.78em;color:var(--muted)">${t.id}</td>
+                <td><strong>${t.nombre}</strong>${t.notas?`<br><small style="color:var(--muted)">${t.notas}</small>`:''}</td>
+                <td style="font-size:.86em;color:var(--muted)">${t.responsable||'-'}</td>
+                <td>${fmt(t.inicio)}</td>
+                <td>${fmt(t.fin)}${atras?' <span style="color:var(--danger)">⚠️</span>':''}</td>
+                <td>${badgeE(t.estado)}</td>
+                <td><div style="display:flex;align-items:center;gap:6px"><div class="pbar" style="min-width:70px"><div class="pbar-fill" style="width:${t.avance}%;background:${p.color}"></div></div><span style="font-size:.8em;font-weight:700">${t.avance}%</span></div></td>
+                ${!soloLec?`<td><button class="btn btn-sm" style="background:var(--mid);color:white" onclick="editarTarea('${p.id}','${t.id}')">✏️</button></td>`:''}
+            </tr>`;
+        });
+        h+='</tbody></table></div></div>';
+    });
+    document.getElementById('edt-container').innerHTML=h;
+}
+
+/* ════════════════════════════════════════════════════
+   GANTT
+   ════════════════════════════════════════════════════ */
+function renderGantt() {
+    const dec = DATOS[rolActivo];
+    if (!dec) return;
+    const scale = document.getElementById('gantt-scale').value;
+    let minD=new Date('2026-02-01'), maxD=new Date('2026-07-31');
+    dec.paquetes.forEach(p=>p.tareas.forEach(t=>{
+        const i=new Date(t.inicio),f=new Date(t.fin);
+        if(i<minD)minD=i; if(f>maxD)maxD=f;
+    }));
+    const cols=[];
+    let cur=new Date(minD);
+    while(cur<=maxD){
+        cols.push(new Date(cur));
+        scale==='sem'?cur.setDate(cur.getDate()+7):cur.setMonth(cur.getMonth()+1);
+    }
+    const cW=54;
+    let h=`<table style="min-width:${300+cols.length*cW}px;border-collapse:collapse">
+    <thead><tr><th style="width:300px;text-align:left;padding:10px 13px;background:var(--dark);color:white">Actividad</th>`;
+    cols.forEach(c=>{
+        const l=scale==='sem'?`S${wk(c)}`:c.toLocaleDateString('es-CO',{month:'short',year:'2-digit'});
+        h+=`<th style="width:${cW}px;text-align:center;font-size:.76em;background:var(--dark);color:white;padding:10px 4px">${l}</th>`;
+    });
+    h+='</tr></thead><tbody>';
+    dec.paquetes.forEach(p=>{
+        h+=`<tr><td colspan="${1+cols.length}" style="background:${p.color}15;padding:7px 13px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.93em;color:${p.color}">${p.nombre}</td></tr>`;
+        p.tareas.forEach(t=>{
+            h+=`<tr><td style="padding:3px 13px;font-size:.84em;border-right:1px solid var(--border);white-space:nowrap;max-width:300px;overflow:hidden;text-overflow:ellipsis">${t.nombre}</td>`;
+            const tI=new Date(t.inicio),tF=new Date(t.fin);
+            cols.forEach((c,idx)=>{
+                const cF=new Date(c);
+                scale==='sem'?cF.setDate(cF.getDate()+7):cF.setMonth(cF.getMonth()+1);
+                if(tI<cF&&tF>=c){
+                    h+=`<td style="padding:3px;border-right:1px solid var(--border)10">
+                        <div style="background:${p.color};opacity:${t.estado==='completado'?1:.7};height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:white;font-size:.7em;font-weight:700">
+                            ${t.estado==='completado'?'✓':t.avance+'%'}
+                        </div></td>`;
+                } else {
+                    h+=`<td style="border-right:1px solid var(--border)20"></td>`;
+                }
+            });
+            h+='</tr>';
+        });
+    });
+    h+='</tbody></table>';
+    document.getElementById('gantt-wrap').innerHTML=h;
+    let ley='';
+    dec.paquetes.forEach(p=>{
+        ley+=`<div style="display:flex;align-items:center;gap:7px"><div style="width:16px;height:16px;background:${p.color};border-radius:4px"></div><span style="font-size:.86em;font-weight:600">${p.nombre}</span></div>`;
+    });
+    document.getElementById('gantt-ley').innerHTML=ley;
+}
+
+/* ════════════════════════════════════════════════════
+   SEGUIMIENTO SEMANAL
+   ════════════════════════════════════════════════════ */
+function buildSemOpts() {
+    const sel=document.getElementById('sem-sel');
+    const ini=new Date('2026-02-01'),fin=new Date('2026-06-30'),hoy=new Date();
+    let cur=new Date(ini),n=1,opts='';
+    while(cur<=fin){
+        const fe=new Date(cur); fe.setDate(fe.getDate()+6);
+        const fR=fe>fin?fin:fe;
+        const esA=hoy>=cur&&hoy<=fR;
+        opts+=`<option value="${n}" ${esA?'selected':''}>Semana ${n} · ${fmt(cur.toISOString().split('T')[0])} – ${fmt(fR.toISOString().split('T')[0])}${esA?' ← ACTUAL':''}</option>`;
+        cur.setDate(cur.getDate()+7); n++;
+    }
+    sel.innerHTML=opts;
+}
+
+function renderSemanal() {
+    const semN=parseInt(document.getElementById('sem-sel').value);
+    const {ini,fin}=semRango(semN);
+    const hoy=new Date(), esA=hoy>=ini&&hoy<=fin, esP=fin<hoy;
+    const dec=DATOS[rolActivo];
+    if(!dec){document.getElementById('sem-container').innerHTML='';return;}
+
+    const tareas=[];
+    dec.paquetes.forEach(p=>p.tareas.forEach(t=>{
+        if(new Date(t.inicio)<=fin&&new Date(t.fin)>=ini) tareas.push({...t,paq:p.nombre,color:p.color,paqId:p.id});
+    }));
+
+    let h=`<div class="panel" style="border-top:3px solid ${esA?'var(--success)':'var(--border)'}">
+    <div class="panel-hdr">
+        <span class="panel-title">Semana ${semN} · ${fmt(ini.toISOString().split('T')[0])} — ${fmt(fin.toISOString().split('T')[0])}</span>
+        ${esA?'<span class="badge badge-completado">Semana Actual</span>':''}
+    </div>
+    <div class="panel-body">
+    <h4 style="font-family:'Barlow Condensed',sans-serif;font-weight:700;margin-bottom:14px;font-size:1.1em">PLAN DE TRABAJO</h4>`;
+
+    if(!tareas.length) h+='<div class="alert alert-info">No hay actividades programadas para esta semana.</div>';
+    else tareas.forEach(t=>{
+        h+=`<div class="seg-item" style="border-color:${t.color}">
+            <div style="display:flex;justify-content:space-between;align-items:start;gap:10px;flex-wrap:wrap">
+                <div><div class="seg-title">${t.nombre}</div>
+                <div class="seg-meta"><strong>Componente:</strong> ${t.paq} · <strong>Responsable:</strong> ${t.responsable||'—'}</div>
+                <div class="seg-meta"><strong>Período:</strong> ${fmt(t.inicio)} → ${fmt(t.fin)}</div></div>
+                <div style="text-align:right">${badgeE(t.estado)}<br>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:6px;min-width:100px">
+                    <div class="pbar"><div class="pbar-fill" style="width:${t.avance}%;background:${t.color}"></div></div>
+                    <span style="font-size:.8em;font-weight:700">${t.avance}%</span>
+                </div></div>
+            </div>
+        </div>`;
+    });
+    h+='</div></div>';
+
+    // Registro
+    const segKey=`${rolActivo}_s${semN}`;
+    const sd=(SEG[rolActivo]||{})[segKey];
+    const soloLec=rolActivo==='vic';
+    const avP=tareas.length?Math.round(tareas.reduce((s,t)=>s+t.avance,0)/tareas.length):0;
+    const compP=tareas.filter(t=>t.estado==='completado').length;
+
+    h+=`<div class="panel" style="margin-top:20px">
+    <div class="panel-hdr">
+        <span class="panel-title">Registro de Avance vs. Proyectado</span>
+        ${!soloLec?`<button class="btn btn-primary" onclick="abrirModalSeg(${semN})">${sd?'✏️ Editar':'+ Registrar Avance'}</button>`:''}
+    </div>
+    <div class="panel-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+        <div style="background:var(--surface);padding:13px;border-radius:8px;text-align:center">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:2em;font-weight:800;color:var(--success)">${avP}%</div>
+            <div style="font-size:.83em;color:var(--muted);font-weight:600">Avance Proyectado</div>
+        </div>
+        <div style="background:var(--surface);padding:13px;border-radius:8px;text-align:center">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:2em;font-weight:800;color:var(--av)">${compP}/${tareas.length}</div>
+            <div style="font-size:.83em;color:var(--muted);font-weight:600">Actividades completadas</div>
+        </div>
+    </div>`;
+
+    if(sd){
+        h+=`<div class="avance-block"><h4>Actividades Realizadas</h4><p>${sd.act}</p></div>`;
+        h+=`<div class="avance-block" style="margin-top:10px"><h4>Resultados Obtenidos</h4><p>${sd.res}</p></div>`;
+        if(sd.obs) h+=`<div class="avance-block" style="margin-top:10px"><h4>Obstáculos</h4><p>${sd.obs}</p></div>`;
+        if(sd.prox) h+=`<div class="avance-block" style="margin-top:10px"><h4>Plan Semana Siguiente</h4><p>${sd.prox}</p></div>`;
+        h+=`<p style="font-size:.78em;color:var(--muted);margin-top:10px">Registrado: ${new Date(sd.fecha).toLocaleString('es-CO')}</p>`;
+    } else {
+        h+='<div class="alert alert-warn">⚠️ Aún no se ha registrado el avance de esta semana.</div>';
+    }
+    h+='</div></div>';
+    document.getElementById('sem-container').innerHTML=h;
+}
+
+function semRango(n){
+    const ini=new Date('2026-02-01'); ini.setDate(ini.getDate()+(n-1)*7);
+    const fin=new Date(ini); fin.setDate(fin.getDate()+6);
+    const max=new Date('2026-06-30');
+    return {ini,fin:fin>max?max:fin};
+}
+
+/* ════════════════════════════════════════════════════
+   MODALS PAQUETE / TAREA / SEGUIMIENTO
+   ════════════════════════════════════════════════════ */
+function abrirModalPaq() {
+    const d=document.getElementById('fp-dots');
+    d.innerHTML=COLORES.map((c,i)=>`<div class="cdot ${i===0?'sel':''}" style="background:${c}" onclick="selColor('${c}',this)"></div>`).join('');
+    document.getElementById('fp-nom').value='';
+    document.getElementById('fp-color').value=COLORES[0];
+    document.getElementById('modal-paq').classList.add('open');
+}
+
+function selColor(c,el){
+    document.getElementById('fp-color').value=c;
+    document.querySelectorAll('#fp-dots .cdot').forEach(d=>d.classList.remove('sel'));
+    el.classList.add('sel');
+}
+
+async function guardarPaq(e){
+    e.preventDefault();
+    const dec=DATOS[rolActivo];
+    const n=dec.paquetes.length+1;
+    dec.paquetes.push({id:'P'+n+'_'+Date.now(),nombre:document.getElementById('fp-nom').value,color:document.getElementById('fp-color').value,tareas:[]});
+    await guardarDatos(rolActivo);
+    cerrarModal('modal-paq'); renderEDT(); renderDashboard();
+}
+
+function abrirModalTarea(paqId){
+    document.getElementById('ft-modo').value='nuevo';
+    document.getElementById('ft-paq').value=paqId;
+    document.getElementById('ft-tid').value='';
+    document.getElementById('mt-titulo').textContent='Nueva Actividad';
+    ['ft-nom','ft-resp','ft-notas'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('ft-ini').value='2026-02-01';
+    document.getElementById('ft-fin').value='';
+    document.getElementById('ft-est').value='pendiente';
+    document.getElementById('ft-av').value='0';
+    document.getElementById('btn-del-tarea').style.display='none';
+    document.getElementById('modal-tarea').classList.add('open');
+}
+
+function editarTarea(paqId,tid){
+    const p=DATOS[rolActivo].paquetes.find(p=>p.id===paqId);
+    const t=p.tareas.find(t=>t.id===tid);
+    document.getElementById('ft-modo').value='editar';
+    document.getElementById('ft-paq').value=paqId;
+    document.getElementById('ft-tid').value=tid;
+    document.getElementById('mt-titulo').textContent='Editar Actividad';
+    document.getElementById('ft-nom').value=t.nombre;
+    document.getElementById('ft-resp').value=t.responsable||'';
+    document.getElementById('ft-ini').value=t.inicio;
+    document.getElementById('ft-fin').value=t.fin;
+    document.getElementById('ft-est').value=t.estado;
+    document.getElementById('ft-av').value=t.avance;
+    document.getElementById('ft-notas').value=t.notas||'';
+    document.getElementById('btn-del-tarea').style.display='inline-flex';
+    document.getElementById('modal-tarea').classList.add('open');
+}
+
+async function guardarTarea(e){
+    e.preventDefault();
+    const modo=document.getElementById('ft-modo').value;
+    const paqId=document.getElementById('ft-paq').value;
+    const tid=document.getElementById('ft-tid').value;
+    const p=DATOS[rolActivo].paquetes.find(p=>p.id===paqId);
+    const datos={nombre:document.getElementById('ft-nom').value,responsable:document.getElementById('ft-resp').value,inicio:document.getElementById('ft-ini').value,fin:document.getElementById('ft-fin').value,estado:document.getElementById('ft-est').value,avance:parseInt(document.getElementById('ft-av').value)||0,notas:document.getElementById('ft-notas').value};
+    if(modo==='nuevo'){datos.id=paqId+'T'+(p.tareas.length+1);p.tareas.push(datos);}
+    else{const idx=p.tareas.findIndex(t=>t.id===tid);p.tareas[idx]={...p.tareas[idx],...datos};}
+    await guardarDatos(rolActivo);
+    cerrarModal('modal-tarea'); renderEDT(); renderDashboard();
+}
+
+async function eliminarTarea(){
+    if(!confirm('¿Eliminar esta actividad?'))return;
+    const paqId=document.getElementById('ft-paq').value;
+    const tid=document.getElementById('ft-tid').value;
+    const p=DATOS[rolActivo].paquetes.find(p=>p.id===paqId);
+    p.tareas=p.tareas.filter(t=>t.id!==tid);
+    await guardarDatos(rolActivo);
+    cerrarModal('modal-tarea'); renderEDT(); renderDashboard();
+}
+
+function abrirModalSeg(n){
+    document.getElementById('fs-sem').value=n;
+    document.getElementById('ms-titulo').textContent=`Seguimiento Semana ${n}`;
+    const sd=(SEG[rolActivo]||{})[`${rolActivo}_s${n}`];
+    document.getElementById('fs-act').value=sd?.act||'';
+    document.getElementById('fs-res').value=sd?.res||'';
+    document.getElementById('fs-obs').value=sd?.obs||'';
+    document.getElementById('fs-prox').value=sd?.prox||'';
+    document.getElementById('modal-seg').classList.add('open');
+}
+
+async function guardarSeg(e){
+    e.preventDefault();
+    const n=document.getElementById('fs-sem').value;
+    const key=`${rolActivo}_s${n}`;
+    if(!SEG[rolActivo]) SEG[rolActivo]={};
+    const datos={act:document.getElementById('fs-act').value,res:document.getElementById('fs-res').value,obs:document.getElementById('fs-obs').value,prox:document.getElementById('fs-prox').value,fecha:new Date().toISOString(),dec:rolActivo};
+    SEG[rolActivo][key]=datos;
+    await guardarSegFirestore(key,datos);
+    cerrarModal('modal-seg'); renderSemanal();
+}
+
+function cerrarModal(id){document.getElementById(id).classList.remove('open')}
+document.querySelectorAll('.modal-ov').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open')}));
+
+/* ════════════════════════════════════════════════════
+   HELPERS
+   ════════════════════════════════════════════════════ */
+function fmt(iso){if(!iso)return'-';const [y,m,d]=(iso.split('T')[0]).split('-');return`${d}/${m}/${y}`}
+function badgeE(e){const m={completado:'badge-completado',progreso:'badge-progreso',pendiente:'badge-pendiente'};const l={completado:'Completado',progreso:'En Progreso',pendiente:'No Iniciado'};return`<span class="badge ${m[e]||'badge-pendiente'}">${l[e]||e}</span>`}
+function wk(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const dn=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-dn);const y=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil((((t-y)/86400000)+1)/7)}
+
+/* ════════════════════════════════════════════════════
+   ARRANQUE
+   ════════════════════════════════════════════════════ */
+window.onload = function() {
+    initFirebase();
+    // Permitir Enter en el PIN
+    document.getElementById('pin-input').addEventListener('keydown', function(e) {
+        if(e.key==='Enter') intentarLogin();
+    });
+};
+</script>
+</body>
+</html>
